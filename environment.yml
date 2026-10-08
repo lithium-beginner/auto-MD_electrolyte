@@ -1,0 +1,16 @@
+name: electrolyte-md
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy
+  - pandas
+  - rdkit
+  - openmm>=8.2,<9
+  - mdanalysis>=2.7,<3
+  - ase
+  - packmol
+  - ambertools
+  - pip
+  - pip:
+      - acpype

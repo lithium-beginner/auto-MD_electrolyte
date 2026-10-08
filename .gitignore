@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv*/
+workdir/
+*.egg-info/
+.amber/
+.tools/
+upstream/
+
+# Local runs, generated archives and parameterization scratch
+.DS_Store
+runs*/
+*.zip
+*.acpype/
+library/validation/smoke/workdir*/
