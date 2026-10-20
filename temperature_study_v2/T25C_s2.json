@@ -1,0 +1,74 @@
+{
+  "purity_policy": "reject",
+  "solvents": [
+    {
+      "name": "EC",
+      "full_name": "Ethylene carbonate",
+      "smiles": "O=C1OCCO1",
+      "mass_fraction": 0.2529,
+      "molar_mass": 88.06,
+      "purity": 1.0
+    },
+    {
+      "name": "EMC",
+      "full_name": "Ethyl methyl carbonate",
+      "smiles": "CCOC(=O)OC",
+      "mass_fraction": 0.5901,
+      "molar_mass": 104.1,
+      "purity": 1.0
+    }
+  ],
+  "additives": [
+    {
+      "name": "VC",
+      "full_name": "Vinylene carbonate",
+      "smiles": "O=C1OC=CO1",
+      "mass_fraction": 0.02,
+      "molar_mass": 86.05,
+      "purity": 1.0
+    },
+    {
+      "name": "FEC",
+      "full_name": "Fluoroethylene carbonate",
+      "smiles": "O=C1OC(F)CO1",
+      "mass_fraction": 0.012,
+      "molar_mass": 106.03,
+      "purity": 1.0
+    }
+  ],
+  "salts": [
+    {
+      "name": "LiPF6",
+      "full_name": "Lithium hexafluorophosphate",
+      "smiles": "[Li+].F[P-](F)(F)(F)(F)F",
+      "mass_fraction": 0.125,
+      "molar_mass": 151.91,
+      "purity": 1.0
+    }
+  ],
+  "recipe_name": "T25C_s2",
+  "time": "2026-10-20T00:00:00+08:00",
+  "simulation": {
+    "temperature": 298.15,
+    "pressure": 1.0,
+    "units": {
+      "temperature": "K",
+      "pressure": "bar",
+      "concentration": "mol/L",
+      "box": "nm"
+    },
+    "total_molecules": 1000,
+    "box_nm": [
+      5.2,
+      5.2,
+      5.2
+    ],
+    "timestep_fs": 1,
+    "nvt_steps": 200000,
+    "npt_steps": 2000000,
+    "production_steps": 20000000,
+    "report_interval": 10000,
+    "seed": 7314,
+    "platform": "CUDA"
+  }
+}

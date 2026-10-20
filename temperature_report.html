@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>电解液温度依赖性 MD 研究 — 1 M LiPF6 / EC:EMC 3:7 + 2% VC + 1.2% FEC</title>
+<style>
+:root{
+  --page:#f9f9f7; --surface-1:#fcfcfb;
+  --text-primary:#0b0b0b; --text-secondary:#52514e; --text-muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4;
+  --ord1:#86b6ef; --ord2:#2a78d6; --ord3:#104281;
+  --critical:#d03b3b; --warning:#fab219; --good:#0ca30c;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:where(:not([data-theme="light"])){
+    --page:#0d0d0d; --surface-1:#1a1a19;
+    --text-primary:#f0efec; --text-secondary:#c3c2b7; --text-muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
+    --ord1:#86b6ef; --ord2:#3987e5; --ord3:#184f95;
+    --critical:#d03b3b; --warning:#fab219; --good:#0ca30c;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --page:#0d0d0d; --surface-1:#1a1a19;
+  --text-primary:#f0efec; --text-secondary:#c3c2b7; --text-muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
+  --ord1:#86b6ef; --ord2:#3987e5; --ord3:#184f95;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--text-primary);
+  font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  font-size:14px;line-height:1.6}
+.wrap{max-width:1120px;margin:0 auto;padding:32px 20px 80px}
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:8px}
+h1{font-size:22px;font-weight:600;margin:0 0 6px;letter-spacing:-0.01em}
+.sub{color:var(--text-secondary);font-size:13px;margin:0}
+h2{font-size:16px;font-weight:600;margin:40px 0 4px;letter-spacing:-0.005em}
+h2:first-of-type{margin-top:32px}
+.h2note{color:var(--text-secondary);font-size:13px;margin:0 0 16px}
+.card{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:18px 20px 14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:860px){.grid2{grid-template-columns:1fr}}
+.btn{font:inherit;font-size:12px;color:var(--text-secondary);background:var(--surface-1);
+  border:1px solid var(--border);border-radius:6px;padding:5px 11px;cursor:pointer}
+.btn:hover{color:var(--text-primary)}
+.btn[aria-pressed="true"]{color:var(--text-primary);border-color:var(--axis)}
+.tools{display:flex;gap:8px;flex-shrink:0}
+
+/* hero */
+.hero{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;
+  padding:22px 24px;margin:24px 0 16px;display:flex;align-items:center;gap:28px;flex-wrap:wrap}
+.hero .fig{font-size:52px;font-weight:600;line-height:1;letter-spacing:-0.02em}
+.hero .txt{flex:1;min-width:260px}
+.hero .lbl{font-size:13px;color:var(--text-secondary);margin-bottom:2px}
+.hero .cap{font-size:12px;color:var(--text-muted);margin-top:6px}
+
+/* kpi */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:8px}
+@media(max-width:860px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.kpi .k{font-size:12px;color:var(--text-secondary);margin-bottom:6px}
+.kpi .v{font-size:24px;font-weight:600;line-height:1.1;letter-spacing:-0.01em}
+.kpi .u{font-size:12px;color:var(--text-muted);margin-top:4px}
+
+/* chart */
+.ctitle{font-size:14px;font-weight:600;margin:0 0 2px}
+.cnote{font-size:12px;color:var(--text-secondary);margin:0 0 10px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin:10px 0 0;padding:0;list-style:none}
+.legend li{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary)}
+.lk-line{width:14px;height:2px;border-radius:1px;flex-shrink:0}
+.lk-rect{width:11px;height:11px;border-radius:2px;flex-shrink:0}
+svg{display:block;width:100%;height:auto;overflow:visible}
+.gl{stroke:var(--grid);stroke-width:1}
+.ax{stroke:var(--axis);stroke-width:1}
+.tk{fill:var(--text-muted);font-size:11px;font-variant-numeric:tabular-nums}
+.atitle{fill:var(--text-secondary);font-size:11px}
+.dlabel{fill:var(--text-secondary);font-size:11px;font-weight:600}
+.dlabel-in{font-size:10px;font-weight:600}
+.hit{fill:transparent;cursor:crosshair}
+.crosshair{stroke:var(--axis);stroke-width:1;pointer-events:none;opacity:0}
+
+/* tooltip */
+.tip{position:fixed;z-index:60;pointer-events:none;opacity:0;transition:opacity .09s;
+  background:var(--surface-1);border:1px solid var(--border);border-radius:8px;
+  padding:9px 11px;box-shadow:0 6px 20px rgba(0,0,0,.14);min-width:132px}
+.tip .th{font-size:11px;color:var(--text-secondary);margin-bottom:6px}
+.tip .tr{display:flex;align-items:center;gap:7px;margin-top:3px}
+.tip .tv{font-size:12px;font-weight:600;color:var(--text-primary);
+  font-variant-numeric:tabular-nums;margin-left:auto;padding-left:10px}
+.tip .tn{font-size:11px;color:var(--text-secondary)}
+
+/* callout */
+.call{border-radius:10px;padding:14px 16px;margin:14px 0;border:1px solid var(--border);
+  background:var(--surface-1);display:flex;gap:11px;align-items:flex-start}
+.call .ic{flex-shrink:0;width:16px;height:16px;margin-top:2px}
+.call .ct{font-size:13px;font-weight:600;margin:0 0 3px}
+.call .cb{font-size:12.5px;color:var(--text-secondary);margin:0}
+.call.bad{border-left:3px solid var(--critical)}
+.call.warn{border-left:3px solid var(--warning)}
+
+/* table */
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--grid)}
+th{color:var(--text-secondary);font-weight:600;font-size:11.5px;white-space:nowrap}
+td{font-variant-numeric:tabular-nums;color:var(--text-primary)}
+th:first-child,td:first-child{text-align:left;font-variant-numeric:normal}
+thead th{border-bottom:1px solid var(--axis)}
+tbody tr:hover{background:color-mix(in oklab,var(--text-primary) 4%,transparent)}
+.tscroll{overflow-x:auto}
+.hidden{display:none}
+ul.notes{padding-left:20px;margin:8px 0;color:var(--text-secondary);font-size:13px}
+ul.notes li{margin:5px 0}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;
+  background:color-mix(in oklab,var(--text-primary) 6%,transparent);padding:1px 5px;border-radius:4px}
+.ok{color:var(--good)} .no{color:var(--critical)}
+footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--grid);
+  color:var(--text-muted);font-size:12px}
+</style>
+</head>
+<body data-palette="#2a78d6,#eb6834,#1baf7a,#eda100,#e87ba4">
+<div class="wrap">
+
+<header>
+  <div>
+    <h1>电解液温度依赖性 MD 研究</h1>
+    <p class="sub">1 M LiPF₆ in EC:EMC (3:7 w/w) + 2 wt% VC + 1.2 wt% FEC　·　0 / 25 / 45 / 60 °C　·　每温度 2 个独立种子 × 20 ns 生产段</p>
+  </div>
+  <div class="tools">
+    <button class="btn" id="tblBtn" aria-pressed="false">表格视图</button>
+    <button class="btn" id="thBtn">切换主题</button>
+  </div>
+</header>
+
+<!-- ========== HERO (exactly one) ========== -->
+<div class="hero">
+  <div class="fig" id="heroFig">—</div>
+  <div class="txt">
+    <div class="lbl">0 → 60 °C 之间 Li⁺ 自扩散系数的提升倍数</div>
+    <div class="cap">同温区间内 σ<sub>NE</sub> 只提升 <strong id="heroSig">—</strong> 倍 —— 升温带来的迁移率增益被同时加剧的离子缔合部分抵消。这是本次研究最主要的发现。</div>
+  </div>
+</div>
+
+<div class="kpis" id="kpis"></div>
+
+<!-- ========== 方法 ========== -->
+<h2>体系与方法</h2>
+<p class="h2note">所有 8 次模拟组成完全相同，仅温度与随机种子不同。</p>
+<div class="card tscroll">
+  <table>
+    <tbody id="methodTbl"></tbody>
+  </table>
+</div>
+
+<!-- ========== 可信结果 ========== -->
+<h2>一、单调且可信的趋势</h2>
+<p class="h2note">自扩散拟合 R² 均 ≥ 0.998，Arrhenius 拟合 R² ≥ 0.98，种子间一致性良好。</p>
+
+<div class="grid2">
+  <div class="card">
+    <p class="ctitle">密度随温度线性下降</p>
+    <p class="cnote">生产段为定容 NVT，密度由 NPT 末帧体积决定；误差杠为 2 个种子的半极差。</p>
+    <div id="chDensity"></div>
+  </div>
+  <div class="card">
+    <p class="ctitle">Nernst–Einstein 电导率 σ<sub>NE</sub></p>
+    <p class="cnote">忽略离子关联，是<strong>上限</strong>估计。集体 Einstein 电导率未收敛（见第三节）。</p>
+    <div id="chSigma"></div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <p class="ctitle">Arrhenius 图：四种组分的自扩散系数</p>
+  <p class="cnote">纵轴对数、横轴 1000/T。四条线近乎平行且笔直，说明各组分在该温区内扩散机制一致。横轴向左为升温。</p>
+  <div id="chArr"></div>
+  <ul class="legend" id="lgArr"></ul>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <p class="ctitle">Arrhenius 活化能</p>
+  <p class="cnote">由 4 个温度点拟合 ln X = ln A − E<sub>a</sub>/RT 得到。Li⁺ 的能垒最高之一 —— 它要拖着溶剂化壳层迁移。</p>
+  <div id="chEa"></div>
+</div>
+
+<!-- ========== 反直觉 ========== -->
+<h2>二、反直觉但自洽的趋势：升温促进离子缔合</h2>
+<p class="h2note">升温过程中 Li⁺ 第一壳层的 EC 被 PF₆⁻ 系统性置换，"自由"Li⁺ 几乎消失。</p>
+
+<div class="grid2">
+  <div class="card">
+    <p class="ctitle">Li⁺ 第一壳层组成</p>
+    <p class="cnote">3.2 Å 内按分子种类计数（单位：个分子）。VC+FEC 合并显示，二者合计始终 &lt; 0.07。</p>
+    <div id="chShell"></div>
+    <ul class="legend" id="lgShell"></ul>
+  </div>
+  <div class="card">
+    <p class="ctitle">离子缔合：壳层内阴离子分子数分布</p>
+    <p class="cnote">有序类别，故采用单色阶（越深＝缔合越强）。基于截断半径的局部计数，非严格团簇识别。</p>
+    <div id="chPair"></div>
+    <ul class="legend" id="lgPair"></ul>
+  </div>
+</div>
+
+<div class="call warn">
+  <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="var(--warning)" d="M8 1.3 15 14H1L8 1.3Z"/><path fill="var(--surface-1)" d="M7.3 5.6h1.4v4.1H7.3zm0 5h1.4v1.4H7.3z"/></svg>
+  <div>
+    <p class="ct">趋势方向可取，绝对程度几乎肯定被夸大</p>
+    <p class="cb">60 °C 下仅 2.6% 的 Li⁺ 完全无阴离子接触，这不符合 1 M 碳酸酯电解液的实际解离状况。本次使用的是<strong>未做电荷缩放</strong>的全电荷非极化力场，会系统性高估离子缔合。机制解释见下方两条，但不要引用具体百分比。</p>
+  </div>
+</div>
+
+<ul class="notes">
+  <li><strong>熵驱动缔合</strong>：Li⁺–PF₆⁻ 成对会把原先被束缚的 EC 释放到本体，体系平动熵增加。温度越高，−TΔS 项权重越大，缔合态越有利。</li>
+  <li><strong>密度降低减弱屏蔽</strong>：升温使盒体积增大约 6%，介质屏蔽变弱，裸库仑吸引相对增强。</li>
+  <li><strong>迁移数接近 0.5</strong>：t(Li⁺) 在 0.48–0.52 之间，即 D(Li⁺) ≈ D(PF₆⁻)。阴阳离子作为近中性离子对协同迁移，是强缔合的直接证据（实验电化学迁移数通常 0.3–0.4）。</li>
+</ul>
+
+<!-- ========== 失效 ========== -->
+<h2>三、已失效的量</h2>
+<p class="h2note">以下结果在本采样长度下不可用，列出以免被误引。</p>
+
+<div class="call bad">
+  <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="var(--critical)"/><path stroke="var(--surface-1)" stroke-width="1.6" stroke-linecap="round" d="M5.5 5.5l5 5m0-5l-5 5"/></svg>
+  <div>
+    <p class="ct">集体 Einstein 电导率 σ<sub>CE</sub>：未收敛，作废</p>
+    <p class="cb">出现负值（0 °C 种子2 得 −0.0006，R²=0.065；45 °C 种子1 得 −0.0120）、种子间差异达 5 倍、随温度非单调。集体电荷位移是<strong>单一集体变量</strong>，无法像自扩散那样对 1085 个分子做统计平均，收敛通常需要 ~100 ns 量级且 5–10 个独立副本。本次 20 ns × 2 副本远远不够。</p>
+  </div>
+</div>
+
+<div class="card">
+  <p class="ctitle">σ<sub>CE</sub> 逐种子原始值（诊断用，非结果）</p>
+  <p class="cnote">两个种子若收敛应相互重合并随温度单调上升。实际散布极大且跨越零线 —— 这正是判定其失效的依据。</p>
+  <div id="chCE"></div>
+  <ul class="legend" id="lgCE"></ul>
+</div>
+
+<ul class="notes">
+  <li><strong>黏度：未计算。</strong>OpenMM 默认 reporter 不输出完整压力张量，Green–Kubo 积分缺少输入数据。</li>
+</ul>
+
+<!-- ========== 系统偏差 ========== -->
+<h2>四、系统性偏差：绝对值不可直接对标实验</h2>
+<p class="h2note">参数库为 <code>gaff2-am1bcc-fullcharge-v1</code>，未做电荷缩放的非极化模型。</p>
+
+<div class="card tscroll">
+  <table>
+    <thead><tr><th>量（25 °C）</th><th>本次 MD</th><th>同类电解液实验量级</th><th style="text-align:left">偏差</th></tr></thead>
+    <tbody id="expTbl"></tbody>
+  </table>
+</div>
+<ul class="notes">
+  <li>"实验量级"是 1 M LiPF₆/碳酸酯体系公认的大致范围，用于判断偏差方向与幅度，<strong>不是对某一篇特定测量的引用</strong>。</li>
+  <li><strong>"密度对、输运错"是全电荷非极化模型的典型指纹</strong>：范德华与体积性质标定得不错，但过强的静电把离子锁在缔合态。</li>
+  <li><span class="ok">✔ 可用</span>：温度趋势、活化能、相对倍数、不同组分之间的相对快慢。</li>
+  <li><span class="no">✘ 不可直接用</span>：D 与 σ 的绝对值。对标实验需先引入电荷缩放（约 0.7–0.8×）或改用极化力场，并重新验证。</li>
+</ul>
+
+<!-- ========== 其他局限 ========== -->
+<h2>五、其他局限</h2>
+<div class="card tscroll">
+  <table>
+    <thead><tr><th>T (°C)</th><th>MSD 双对数斜率 β</th><th style="text-align:left">扩散区判定</th></tr></thead>
+    <tbody id="betaTbl"></tbody>
+  </table>
+</div>
+<ul class="notes">
+  <li><strong>低温未完全进入扩散区</strong>：β 在 0 °C 仅 0.89（理想扩散为 1.0），故 0 °C 的 D 可能被略微高估，活化能相应略有低估。</li>
+  <li><strong>Li⁺ 模型迁移</strong>：Li⁺ 参数取自针对 TIP3P 水标定的 Joung–Cheatham 模型，迁移到碳酸酯体系未经本项目验证。</li>
+  <li><strong>体积选取</strong>：生产段体积取 NPT 最后一帧而非平均体积，种子间密度散布 0.2–1.6%，会同比例影响浓度与电导。</li>
+  <li><strong>Langevin 恒温器</strong>：摩擦 1/ps 会影响输运，未做摩擦依赖性检验。</li>
+  <li><strong>有限尺寸效应</strong>：1085 个分子单盒未做 Yeh–Hummer 修正，会使 D 系统性偏低。注意这与上一节的低估<strong>同向叠加</strong>，不能相互抵消。</li>
+  <li><strong>配位数口径</strong>：供体选区为「O 或 F」，故"配位数"含溶剂 O、FEC 的 F 与 PF₆⁻ 的 F。它随温度上升（8.03→8.99）主要来自 PF₆⁻ 置换 EC 后贡献更多 F 原子，<strong>不代表配位变强</strong>；判断结构变化应看按分子分解的壳层组成。该选区无法简化 —— 阴离子接触分类依赖 PF₆⁻ 的 F 落在供体选区内。</li>
+</ul>
+
+<!-- ========== 表格视图 ========== -->
+<div id="tblView" class="hidden">
+  <h2>完整数据（逐种子）</h2>
+  <p class="h2note">上方所有图表的数值来源。D 单位 m²/s，σ 单位 S/m。</p>
+  <div class="card tscroll"><table id="fullTbl"></table></div>
+</div>
+
+<footer>
+  工作目录 <code>runs_v2/</code>　·　报告 <code>TEMPERATURE_REPORT.md</code>　·　数据表 <code>temperature_results.csv</code><br>
+  OpenMM 8.3.1 · CUDA 12.8 · NVIDIA H20 ×8　·　每任务 63–64 分钟　·　GAFF2/AM1-BCC
+</footer>
+</div>
+
+<div class="tip" id="tip" role="status" aria-live="polite"></div>
+
+<script>
+const RAW={"temps":[{"T_C":0,"T_K":273.15,"seeds":[{"seed":"s1","rho":1.226949261491834,"vol":139.4086627995768,"conc":1.012460903614703,"Tmean":273.2228027614367,"D":{"EC":{"D":4.0116793495953704e-11,"r2":0.9999146766123679},"EMC":{"D":4.395960081390835e-11,"r2":0.9999431338543138},"VC":{"D":5.3265526388879064e-11,"r2":0.9990862121840067},"FEC":{"D":1.8447588216757637e-11,"r2":0.9958307253058822},"Li":{"D":8.345291527881883e-12,"r2":0.9992950963853945},"PF6":{"D":9.417652951206789e-12,"r2":0.9999002121435548}},"sNE":0.07371916756182108,"sCE":0.02013441170258969,"sCE_r2":0.9524586593675046,"CN":7.990047058823529,"shell":{"EC":1.0087705882352946,"EMC":1.8896058823529402,"PF6":1.1159000000000001,"VC":0.05462941176470587,"FEC":0.025},"pair":{"0_anions":20.274117647058823,"1_anion":52.68000000000001,"2plus_anions":27.045882352941174}},{"seed":"s2","rho":1.239742979017731,"vol":137.9700384610042,"conc":1.0230179123250034,"Tmean":273.23949373011453,"D":{"EC":{"D":3.029645006845677e-11,"r2":0.9999611644581822},"EMC":{"D":3.0997842658074695e-11,"r2":0.9996980928130977},"VC":{"D":3.3959955476692766e-11,"r2":0.9996889601835386},"FEC":{"D":1.650106264675927e-11,"r2":0.9933138284603567},"Li":{"D":6.9430488312960155e-12,"r2":0.9991418321757545},"PF6":{"D":7.40437987387051e-12,"r2":0.9993348882137684}},"sNE":0.06016508237292579,"sCE":-0.0005707144009053542,"sCE_r2":0.06485373119659366,"CN":8.07175294117647,"shell":{"EC":1.026923529411765,"EMC":1.7601941176470595,"PF6":1.188105882352942,"FEC":0.013658823529411763,"VC":0.04624117647058822},"pair":{"0_anions":12.851764705882355,"1_anion":57.37,"2plus_anions":29.77823529411765}}]},{"T_C":25,"T_K":298.15,"seeds":[{"seed":"s1","rho":1.197127113908618,"vol":142.88156202791083,"conc":0.9878518873009324,"Tmean":298.2197746734456,"D":{"EC":{"D":1.3982194309105656e-10,"r2":0.9999876322835503},"EMC":{"D":1.3399854519251149e-10,"r2":0.9999955083372969},"VC":{"D":2.0090934778864612e-10,"r2":0.9998003931061956},"FEC":{"D":7.47027880304909e-11,"r2":0.9982066204445882},"Li":{"D":2.6691168682306047e-11,"r2":0.9996332113205834},"PF6":{"D":2.6617327281139748e-11,"r2":0.9999402093412392}},"sNE":0.19776154986012207,"sCE":0.0990154862205268,"sCE_r2":0.9880903394188676,"CN":8.354476470588235,"shell":{"EC":0.7963470588235299,"EMC":1.7976999999999996,"PF6":1.3269529411764704,"VC":0.0228235294117647,"FEC":0.0079},"pair":{"0_anions":9.798235294117646,"1_anion":53.12941176470588,"2plus_anions":37.072352941176476}},{"seed":"s2","rho":1.1995956429796453,"vol":142.58753643796473,"conc":0.9898889077951423,"Tmean":298.2091069945573,"D":{"EC":{"D":1.3603380718693553e-10,"r2":0.9999432719357862},"EMC":{"D":1.230355691250445e-10,"r2":0.9999880784192061},"VC":{"D":1.6016194250123996e-10,"r2":0.9994683286152523},"FEC":{"D":1.0478453446473466e-10,"r2":0.9995953967434277},"Li":{"D":2.3041169360873923e-11,"r2":0.9990755119547586},"PF6":{"D":2.2194994339928348e-11,"r2":0.9989085641342711}},"sNE":0.1681612079328878,"sCE":0.018291408877983396,"sCE_r2":0.9756563943505597,"CN":8.197417647058826,"shell":{"EC":0.7651058823529413,"EMC":1.7980411764705884,"PF6":1.2820176470588243,"FEC":0.01098823529411765,"VC":0.053705882352941145},"pair":{"0_anions":7.231764705882353,"1_anion":61.625882352941176,"2plus_anions":31.142352941176473}}]},{"T_C":45,"T_K":318.15,"seeds":[{"seed":"s1","rho":1.1789399000914087,"vol":145.08576023956314,"conc":0.9728440646188804,"Tmean":318.3296316459576,"D":{"EC":{"D":2.567373254403235e-10,"r2":0.9999736866573513},"EMC":{"D":2.310768611222105e-10,"r2":0.9999618169244462},"VC":{"D":3.5716761926847085e-10,"r2":0.9999921161360127},"FEC":{"D":2.7118836047596774e-10,"r2":0.9998990851921269},"Li":{"D":5.1815941792585836e-11,"r2":0.9988504046219296},"PF6":{"D":4.7965148223889106e-11,"r2":0.9982960876789676}},"sNE":0.3416236724899428,"sCE":-0.011992057539915337,"sCE_r2":0.6892731299185736,"CN":8.729617647058822,"shell":{"EC":0.6138647058823536,"EMC":1.6473882352941183,"PF6":1.5226647058823533,"FEC":0.010505882352941183,"VC":0.03429999999999998},"pair":{"0_anions":3.5970588235294114,"1_anion":51.97764705882353,"2plus_anions":44.425294117647056}},{"seed":"s2","rho":1.1977913217709761,"vol":142.80231947984893,"conc":0.9884000569731242,"Tmean":318.19321191060436,"D":{"EC":{"D":2.0193740080893482e-10,"r2":0.9999859294368628},"EMC":{"D":1.7761919531120177e-10,"r2":0.999966897184346},"VC":{"D":2.207443946377857e-10,"r2":0.999635190634622},"FEC":{"D":1.3133370951194124e-10,"r2":0.9996377802426193},"Li":{"D":3.3351359467841156e-11,"r2":0.9996130417247725},"PF6":{"D":3.2100426291951515e-11,"r2":0.9994082557619874}},"sNE":0.22767258655476988,"sCE":0.05067534067329348,"sCE_r2":0.99897760088141,"CN":8.542611764705882,"shell":{"EC":0.6177647058823528,"EMC":1.6841235294117645,"PF6":1.478770588235294,"VC":0.021505882352941173,"FEC":0.02354117647058824},"pair":{"0_anions":4.211764705882353,"1_anion":53.11941176470588,"2plus_anions":42.66882352941177}}]},{"T_C":60,"T_K":333.15,"seeds":[{"seed":"s1","rho":1.1575832948751974,"vol":147.76247850141553,"conc":0.9552209880428124,"Tmean":333.2605178463432,"D":{"EC":{"D":3.7907679370445234e-10,"r2":0.9999567834903715},"EMC":{"D":3.6665992979042873e-10,"r2":0.999996184145208},"VC":{"D":5.286742985853028e-10,"r2":0.999680135647032},"FEC":{"D":3.244086458586875e-10,"r2":0.9950626279514806},"Li":{"D":8.355314935879172e-11,"r2":0.9998761826455852},"PF6":{"D":8.247758684535086e-11,"r2":0.9999345472251061}},"sNE":0.5330168512248242,"sCE":0.04150503400551637,"sCE_r2":0.9655558773462138,"CN":8.97259411764706,"shell":{"EC":0.5480705882352942,"EMC":1.5005235294117643,"VC":0.02600588235294117,"PF6":1.6597529411764707,"FEC":0.010158823529411767},"pair":{"0_anions":2.6470588235294117,"1_anion":44.18705882352941,"2plus_anions":53.165882352941175}},{"seed":"s2","rho":1.1686626934239392,"vol":146.3616319676676,"conc":0.9643635344333763,"Tmean":333.1624677787068,"D":{"EC":{"D":3.4716968077487527e-10,"r2":0.9999970901920954},"EMC":{"D":3.263266122287696e-10,"r2":0.9999971998765996},"VC":{"D":4.1989888009864536e-10,"r2":0.9996028682549486},"FEC":{"D":3.154063153088674e-10,"r2":0.9996493972686654},"Li":{"D":6.733885150608233e-11,"r2":0.9997856418936576},"PF6":{"D":6.770026558216102e-11,"r2":0.9996841511234578}},"sNE":0.4376721973061103,"sCE":0.045350661199256355,"sCE_r2":0.9930892427526318,"CN":8.99803529411765,"shell":{"PF6":1.6724647058823532,"EC":0.5207117647058827,"EMC":1.53344705882353,"FEC":0.015229411764705884,"VC":0.013252941176470587},"pair":{"0_anions":2.6388235294117646,"1_anion":43.12705882352941,"2plus_anions":54.234117647058824}}]}],"arrhenius":{"D_Li":{"Ea":28.22642243182852,"r2":0.9938260688208759,"ratio":9.869743694860283},"D_PF6":{"Ea":26.717987485885562,"r2":0.9916471717575143,"ratio":8.927449731499486},"D_EC":{"Ea":29.027615111030798,"r2":0.9825465618057383,"ratio":10.314060789075768},"D_EMC":{"Ea":27.370122366707083,"r2":0.9873089818787907,"ratio":9.245066399285841},"sNE":{"Ea":24.264834382775284,"r2":0.9921206435845648,"ratio":7.25021090235807}},"beta":{"0":0.8943722000566556,"25":0.9033446931589099,"45":0.9116659141497029,"60":0.9735954038668748}};
+
+/* ---------- helpers ---------- */
+const SV=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const mean=a=>a.reduce((x,y)=>x+y,0)/a.length;
+const half=a=>a.length>1?(Math.max(...a)-Math.min(...a))/2:0;
+const T=RAW.temps, TC=T.map(t=>t.T_C);
+const agg=f=>T.map(t=>({m:mean(t.seeds.map(f)),e:half(t.seeds.map(f))}));
+const rho=agg(s=>s.rho), sNE=agg(s=>s.sNE), vol=agg(s=>s.vol), conc=agg(s=>s.conc);
+const CN=agg(s=>s.CN), Tm=agg(s=>s.Tmean);
+const DD={}; ['Li','PF6','EC','EMC','VC','FEC'].forEach(k=>DD[k]=agg(s=>s.D[k].D));
+const tLi=T.map((t,i)=>DD.Li[i].m/(DD.Li[i].m+DD.PF6[i].m));
+const shell=k=>agg(s=>s.shell[k]||0);
+const SH={EC:shell('EC'),EMC:shell('EMC'),PF6:shell('PF6'),
+          VCFEC:T.map(t=>({m:mean(t.seeds.map(s=>(s.shell.VC||0)+(s.shell.FEC||0))),e:0}))};
+const PR={a0:agg(s=>s.pair['0_anions']),a1:agg(s=>s.pair['1_anion']),a2:agg(s=>s.pair['2plus_anions'])};
+const fmtE=v=>{const e=Math.floor(Math.log10(Math.abs(v)));const m=v/Math.pow(10,e);
+  return m.toFixed(2)+'×10'+String(e).replace(/-/g,'⁻').replace(/\d/g,d=>'⁰¹²³⁴⁵⁶⁷⁸⁹'[d]);};
+/* 轴刻度用紧凑写法，避免与旋转的 y 轴标题相撞 */
+const fmtTick=v=>{const e=Math.floor(Math.log10(Math.abs(v)));
+  const m=Math.round(v/Math.pow(10,e));
+  return m+'×10'+String(e).replace(/-/g,'⁻').replace(/\d/g,d=>'⁰¹²³⁴⁵⁶⁷⁸⁹'[d]);};
+const SVGNS='http://www.w3.org/2000/svg';
+function el(t,a={}){const n=document.createElementNS(SVGNS,t);
+  for(const k in a)n.setAttribute(k,a[k]);return n;}
+function mk(host,w,h){host.textContent='';
+  const s=el('svg',{viewBox:`0 0 ${w} ${h}`,role:'img'});host.appendChild(s);return s;}
+
+/* tooltip */
+const tip=document.getElementById('tip');
+function showTip(x,y,title,rows){
+  tip.textContent='';
+  const th=document.createElement('div');th.className='th';th.textContent=title;tip.appendChild(th);
+  rows.forEach(r=>{
+    const d=document.createElement('div');d.className='tr';
+    if(r.color){const k=document.createElement('span');
+      k.className=r.rect?'lk-rect':'lk-line';k.style.background=r.color;d.appendChild(k);}
+    const n=document.createElement('span');n.className='tn';n.textContent=r.name;d.appendChild(n);
+    const v=document.createElement('span');v.className='tv';v.textContent=r.value;d.appendChild(v);
+    tip.appendChild(d);});
+  tip.style.opacity='1';
+  const b=tip.getBoundingClientRect();
+  let L=x+14,TT=y-b.height/2;
+  if(L+b.width>innerWidth-8)L=x-b.width-14;
+  TT=Math.max(8,Math.min(TT,innerHeight-b.height-8));
+  tip.style.left=L+'px';tip.style.top=TT+'px';
+}
+const hideTip=()=>tip.style.opacity='0';
+
+/* ---------- line chart (continuous x) ---------- */
+function lineChart(host,o){
+  const W=o.w||520,H=o.h||300,M={t:18,r:o.mr||56,b:46,l:o.ml||62};
+  const s=mk(host,W,H), iw=W-M.l-M.r, ih=H-M.t-M.b;
+  const xs=o.x, xmin=o.xmin??Math.min(...xs), xmax=o.xmax??Math.max(...xs);
+  const pad=(xmax-xmin)*0.08;
+  const X=v=>M.l+(v-(xmin-pad))/((xmax+pad)-(xmin-pad))*iw;
+  const log=!!o.logY;
+  const tv=v=>log?Math.log10(v):v;
+  let lo=o.ymin??Math.min(...o.series.flatMap(S=>S.y.map((v,i)=>v-(S.e?S.e[i]:0)))),
+      hi=o.ymax??Math.max(...o.series.flatMap(S=>S.y.map((v,i)=>v+(S.e?S.e[i]:0))));
+  let l2=tv(lo),h2=tv(hi); const sp=(h2-l2)||1; l2-=sp*0.12; h2+=sp*0.12;
+  const Y=v=>M.t+ih-(tv(v)-l2)/(h2-l2)*ih;
+  // grid + y ticks
+  (o.yTicks||[]).forEach(t=>{const y=Y(t.v); if(y<M.t-1||y>M.t+ih+1)return;
+    s.appendChild(el('line',{class:'gl',x1:M.l,x2:M.l+iw,y1:y,y2:y}));
+    const x=el('text',{class:'tk',x:M.l-8,y:y+4,'text-anchor':'end'});x.textContent=t.l;s.appendChild(x);});
+  // axes
+  s.appendChild(el('line',{class:'ax',x1:M.l,x2:M.l+iw,y1:M.t+ih,y2:M.t+ih}));
+  // x ticks
+  o.xTicks.forEach(t=>{const x=X(t.v);
+    const q=el('text',{class:'tk',x,y:M.t+ih+18,'text-anchor':'middle'});q.textContent=t.l;s.appendChild(q);
+    if(t.l2){const r=el('text',{class:'tk',x,y:M.t+ih+32,'text-anchor':'middle',opacity:.75});
+      r.textContent=t.l2;s.appendChild(r);}});
+  const at=el('text',{class:'atitle',x:M.l+iw/2,y:H-4,'text-anchor':'middle'});
+  at.textContent=o.xLabel;s.appendChild(at);
+  const yt=el('text',{class:'atitle',x:14,y:M.t+ih/2,'text-anchor':'middle',
+    transform:`rotate(-90 14 ${M.t+ih/2})`});yt.textContent=o.yLabel;s.appendChild(yt);
+  if(o.zero!==undefined){const y=Y(o.zero);
+    s.appendChild(el('line',{x1:M.l,x2:M.l+iw,y1:y,y2:y,stroke:SV('--axis'),'stroke-width':1}));}
+  // series
+  o.series.forEach(S=>{
+    const c=SV(S.color);
+    if(S.e)S.y.forEach((v,i)=>{const x=X(xs[i]),e=S.e[i];if(!e)return;
+      s.appendChild(el('line',{x1:x,x2:x,y1:Y(v-e),y2:Y(v+e),stroke:c,'stroke-width':1.5,opacity:.55}));
+      [v-e,v+e].forEach(q=>s.appendChild(el('line',{x1:x-3,x2:x+3,y1:Y(q),y2:Y(q),
+        stroke:c,'stroke-width':1.5,opacity:.55})));});
+    if(!S.dotsOnly){
+      const d=S.y.map((v,i)=>`${i?'L':'M'}${X(xs[i])},${Y(v)}`).join(' ');
+      s.appendChild(el('path',{d,fill:'none',stroke:c,'stroke-width':2,
+        'stroke-linejoin':'round','stroke-linecap':'round'}));}
+    S.y.forEach((v,i)=>{const g=X(xs[i]),y=Y(v);
+      s.appendChild(el('circle',{cx:g,cy:y,r:6.5,fill:SV('--surface-1')}));
+      s.appendChild(el('circle',{cx:g,cy:y,r:4.5,fill:c}));});
+    if(S.label){const li=S.y.length-1;
+      const t=el('text',{class:'dlabel',x:X(xs[li])+10,y:Y(S.y[li])+4});
+      t.textContent=S.label;s.appendChild(t);}
+  });
+  // crosshair + hit
+  const ch=el('line',{class:'crosshair',y1:M.t,y2:M.t+ih});s.appendChild(ch);
+  const hit=el('rect',{class:'hit',x:M.l,y:M.t,width:iw,height:ih});s.appendChild(hit);
+  const move=ev=>{const bb=s.getBoundingClientRect();
+    const px=(ev.clientX-bb.left)/bb.width*W;
+    let bi=0,bd=1e9;xs.forEach((v,i)=>{const d=Math.abs(X(v)-px);if(d<bd){bd=d;bi=i;}});
+    const gx=X(xs[bi]);ch.setAttribute('x1',gx);ch.setAttribute('x2',gx);ch.style.opacity='1';
+    showTip(ev.clientX,ev.clientY,o.tipTitle(bi),
+      o.series.map(S=>({color:SV(S.color),name:S.name,value:S.fmt(S.y[bi],bi)})));};
+  hit.addEventListener('pointermove',move);
+  hit.addEventListener('pointerleave',()=>{ch.style.opacity='0';hideTip();});
+  return s;
+}
+
+/* ---------- stacked column ---------- */
+function stackChart(host,o){
+  const W=o.w||520,H=o.h||300,M={t:18,r:14,b:46,l:o.ml||56};
+  const s=mk(host,W,H),iw=W-M.l-M.r,ih=H-M.t-M.b;
+  const n=o.cats.length,band=iw/n,bw=Math.min(24,band*0.52),GAP=2;
+  const tot=o.cats.map((_,i)=>o.series.reduce((a,S)=>a+S.y[i],0));
+  const hiV=o.ymax??Math.max(...tot)*1.1;
+  const Y=v=>M.t+ih-v/hiV*ih;
+  (o.yTicks||[]).forEach(t=>{const y=Y(t.v);
+    s.appendChild(el('line',{class:'gl',x1:M.l,x2:M.l+iw,y1:y,y2:y}));
+    const q=el('text',{class:'tk',x:M.l-8,y:y+4,'text-anchor':'end'});q.textContent=t.l;s.appendChild(q);});
+  s.appendChild(el('line',{class:'ax',x1:M.l,x2:M.l+iw,y1:M.t+ih,y2:M.t+ih}));
+  o.cats.forEach((c,i)=>{
+    const cx=M.l+band*(i+.5);
+    const q=el('text',{class:'tk',x:cx,y:M.t+ih+18,'text-anchor':'middle'});q.textContent=c;s.appendChild(q);
+    let acc=0;
+    o.series.forEach((S,si)=>{
+      const v=S.y[i];if(v<=0)return;
+      const y0=Y(acc),y1=Y(acc+v);acc+=v;
+      let top=y1,bot=y0; if(si>0)bot-=GAP; const hgt=Math.max(0,bot-top);
+      if(hgt<=0)return;
+      const isTop=si===o.series.length-1;
+      const g=el('g');
+      const r=el('path',{fill:SV(S.color),d:isTop
+        ? `M${cx-bw/2},${bot} L${cx-bw/2},${top+4} Q${cx-bw/2},${top} ${cx-bw/2+4},${top} L${cx+bw/2-4},${top} Q${cx+bw/2},${top} ${cx+bw/2},${top+4} L${cx+bw/2},${bot} Z`
+        : `M${cx-bw/2},${bot} L${cx-bw/2},${top} L${cx+bw/2},${top} L${cx+bw/2},${bot} Z`});
+      g.appendChild(r);
+      // inline label only if it fits
+      if(S.inLabel&&hgt>=15){
+        const t=el('text',{class:'dlabel-in',x:cx,y:(top+bot)/2+3.5,'text-anchor':'middle',
+          fill:S.inkOnFill||'#fff'});
+        t.textContent=S.inLabel(v);g.appendChild(t);}
+      const hr=el('rect',{x:cx-Math.max(bw/2,12),y:top,width:Math.max(bw,24),height:Math.max(hgt,10),
+        fill:'transparent',style:'cursor:pointer'});
+      hr.addEventListener('pointermove',ev=>{r.setAttribute('opacity','.78');
+        showTip(ev.clientX,ev.clientY,o.tipTitle(i),
+          o.series.map(Q=>({color:SV(Q.color),rect:1,name:Q.name,value:Q.fmt(Q.y[i])})));});
+      hr.addEventListener('pointerleave',()=>{r.removeAttribute('opacity');hideTip();});
+      g.appendChild(hr);s.appendChild(g);
+    });
+  });
+  const at=el('text',{class:'atitle',x:M.l+iw/2,y:H-4,'text-anchor':'middle'});
+  at.textContent=o.xLabel;s.appendChild(at);
+  const yt=el('text',{class:'atitle',x:14,y:M.t+ih/2,'text-anchor':'middle',
+    transform:`rotate(-90 14 ${M.t+ih/2})`});yt.textContent=o.yLabel;s.appendChild(yt);
+}
+
+/* ---------- horizontal bars (one series, nominal) ---------- */
+function barChart(host,o){
+  const W=o.w||1040,rowH=38,M={t:8,r:70,b:34,l:o.ml||150};
+  const H=M.t+o.items.length*rowH+M.b;
+  const s=mk(host,W,H),iw=W-M.l-M.r;
+  const hi=Math.max(...o.items.map(d=>d.v))*1.12;
+  const X=v=>M.l+v/hi*iw, bh=Math.min(24,rowH*0.5);
+  (o.xTicks||[]).forEach(t=>{const x=X(t.v);
+    s.appendChild(el('line',{class:'gl',x1:x,x2:x,y1:M.t,y2:M.t+o.items.length*rowH}));
+    const q=el('text',{class:'tk',x,y:H-16,'text-anchor':'middle'});q.textContent=t.l;s.appendChild(q);});
+  s.appendChild(el('line',{class:'ax',x1:M.l,x2:M.l,y1:M.t,y2:M.t+o.items.length*rowH}));
+  o.items.forEach((d,i)=>{
+    const cy=M.t+rowH*i+rowH/2, x1=X(d.v), c=SV('--s1');
+    const lb=el('text',{class:'tk',x:M.l-10,y:cy+4,'text-anchor':'end',
+      style:'font-variant-numeric:normal'});
+    lb.textContent=d.k;s.appendChild(lb);
+    const g=el('g');
+    const r=el('path',{fill:c,d:`M${M.l},${cy-bh/2} L${x1-4},${cy-bh/2} Q${x1},${cy-bh/2} ${x1},${cy-bh/2+4} L${x1},${cy+bh/2-4} Q${x1},${cy+bh/2} ${x1-4},${cy+bh/2} L${M.l},${cy+bh/2} Z`});
+    g.appendChild(r);
+    const vt=el('text',{class:'dlabel',x:x1+9,y:cy+4});vt.textContent=d.lab;g.appendChild(vt);
+    const hr=el('rect',{x:M.l,y:cy-rowH/2,width:iw,height:rowH,fill:'transparent',style:'cursor:pointer'});
+    hr.addEventListener('pointermove',ev=>{r.setAttribute('opacity','.78');
+      showTip(ev.clientX,ev.clientY,d.k,[{color:c,rect:1,name:o.vName,value:d.lab},
+        {name:'拟合 R²',value:d.r2}]);});
+    hr.addEventListener('pointerleave',()=>{r.removeAttribute('opacity');hideTip();});
+    g.appendChild(hr);s.appendChild(g);
+  });
+  const at=el('text',{class:'atitle',x:M.l+iw/2,y:H-2,'text-anchor':'middle'});
+  at.textContent=o.xLabel;s.appendChild(at);
+}
+
+/* ---------- legend ---------- */
+function legend(host,items,rect){
+  host.textContent='';
+  items.forEach(it=>{const li=document.createElement('li');
+    const k=document.createElement('span');k.className=rect?'lk-rect':'lk-line';
+    k.style.background=SV(it.color);li.appendChild(k);
+    li.appendChild(document.createTextNode(it.name));host.appendChild(li);});
+}
+
+/* ---------- render ---------- */
+function render(){
+  const A=RAW.arrhenius;
+  document.getElementById('heroFig').textContent=A.D_Li.ratio.toFixed(1)+'×';
+  document.getElementById('heroSig').textContent=A.sNE.ratio.toFixed(1);
+
+  // KPI
+  const kp=[
+    {k:'密度变化 0→60 °C',v:((rho[3].m-rho[0].m)/rho[0].m*100).toFixed(1)+'%',u:`${rho[0].m.toFixed(4)} → ${rho[3].m.toFixed(4)} g/cm³`},
+    {k:'D(Li⁺) 活化能',v:A.D_Li.Ea.toFixed(1),u:'kJ/mol　(R² '+A.D_Li.r2.toFixed(3)+')'},
+    {k:'σ_NE @ 25 °C',v:sNE[1].m.toFixed(3),u:'S/m　实验量级 ~0.8–1.0'},
+    {k:'无阴离子接触的 Li⁺',v:PR.a0[0].m.toFixed(1)+'% → '+PR.a0[3].m.toFixed(1)+'%',u:'0 → 60 °C　缔合增强'}];
+  const kh=document.getElementById('kpis');kh.textContent='';
+  kp.forEach(d=>{const c=document.createElement('div');c.className='kpi';
+    const a=document.createElement('div');a.className='k';a.textContent=d.k;
+    const b=document.createElement('div');b.className='v';b.textContent=d.v;
+    const e=document.createElement('div');e.className='u';e.textContent=d.u;
+    c.append(a,b,e);kh.appendChild(c);});
+
+  // method
+  const mt=[['组成（质量分数）','EC 25.29% · EMC 59.01% · VC 2.00% · FEC 1.20% · LiPF₆ 12.50%'],
+    ['分子数','EC 296 · EMC 584 · VC 24 · FEC 11 · Li⁺ 85 · PF₆⁻ 85　＝ 1085 个分子 / 12702 个原子'],
+    ['标称盐浓度','初始盒 1.0038 mol/L；NPT 松弛后 '+conc[3].m.toFixed(3)+'–'+conc[0].m.toFixed(3)+' mol/L'],
+    ['力场','GAFF2/AM1-BCC（gaff2-am1bcc-fullcharge-v1，未做电荷缩放）；Li⁺ 为 Joung–Cheatham TIP3P 模型'],
+    ['初始盒','5.2³ nm³，初始密度 1.2164 g/cm³'],
+    ['流程','能量最小化 → NVT 200 ps → NPT 2 ns → 固定末态体积 NVT 生产 20 ns'],
+    ['积分','LangevinMiddle · 1 fs · 摩擦 1 /ps · PME · 氢键约束 · 截断 1.0 nm'],
+    ['采样','帧间隔 10 ps（2000 帧）；每温度 2 个独立种子（不同 Packmol 装箱 + 不同初速度）'],
+    ['硬件 / 耗时','NVIDIA H20 ×8 一对一并行 · 每任务 63–64 分钟 · 单卡 ~460 ns/day']];
+  const mb=document.getElementById('methodTbl');mb.textContent='';
+  mt.forEach(([a,b])=>{const tr=document.createElement('tr');
+    const th=document.createElement('th');th.style.textAlign='left';th.style.width='150px';th.textContent=a;
+    const td=document.createElement('td');td.style.textAlign='left';
+    td.style.fontVariantNumeric='normal';td.textContent=b;
+    tr.append(th,td);mb.appendChild(tr);});
+
+  const xt=TC.map(t=>({v:t,l:t+'°C'}));
+
+  // density
+  lineChart(document.getElementById('chDensity'),{
+    x:TC,xTicks:xt,xLabel:'温度 (°C)',yLabel:'密度 (g/cm³)',mr:20,
+    yTicks:[1.15,1.17,1.19,1.21,1.23,1.25].map(v=>({v,l:v.toFixed(2)})),
+    series:[{name:'密度',color:'--s1',y:rho.map(d=>d.m),e:rho.map(d=>d.e),
+      fmt:v=>v.toFixed(4)+' g/cm³'}],
+    tipTitle:i=>TC[i]+' °C（'+Tm[i].m.toFixed(1)+' K 实测）'});
+
+  // sigma_NE
+  lineChart(document.getElementById('chSigma'),{
+    x:TC,xTicks:xt,xLabel:'温度 (°C)',yLabel:'σ_NE (S/m)',mr:20,ymin:0,
+    yTicks:[0,0.1,0.2,0.3,0.4,0.5,0.6].map(v=>({v,l:v.toFixed(1)})),
+    series:[{name:'σ_NE',color:'--s1',y:sNE.map(d=>d.m),e:sNE.map(d=>d.e),
+      fmt:v=>v.toFixed(3)+' S/m'}],
+    tipTitle:i=>TC[i]+' °C'});
+
+  // Arrhenius
+  const invT=T.map(t=>1000/t.T_K);
+  const sp=[['Li','Li⁺','--s1'],['PF6','PF₆⁻','--s2'],['EC','EC','--s3'],['EMC','EMC','--s4']];
+  lineChart(document.getElementById('chArr'),{
+    w:1040,h:400,x:invT,logY:true,mr:26,ml:78,
+    xTicks:T.map((t,i)=>({v:invT[i],l:invT[i].toFixed(2),l2:t.T_C+'°C'})),
+    xLabel:'1000 / T  (K⁻¹)　—　向左为升温',yLabel:'自扩散系数 D (m²/s，对数轴)',
+    yTicks:[5e-12,1e-11,2e-11,5e-11,1e-10,2e-10,5e-10].map(v=>({v,l:fmtTick(v)})),
+    series:sp.map(([k,nm,c])=>({name:nm,color:c,y:DD[k].map(d=>d.m),
+      fmt:v=>v.toExponential(2)+' m²/s'})),
+    tipTitle:i=>TC[i]+' °C　(1000/T = '+invT[i].toFixed(3)+')'});
+  legend(document.getElementById('lgArr'),sp.map(([k,nm,c])=>({name:nm,color:c})));
+
+  // Ea
+  barChart(document.getElementById('chEa'),{
+    items:[['D(Li⁺)','D_Li'],['D(EC)','D_EC'],['D(EMC)','D_EMC'],['D(PF₆⁻)','D_PF6'],['σ_NE','sNE']]
+      .map(([k,q])=>({k,v:A[q].Ea,lab:A[q].Ea.toFixed(1),r2:A[q].r2.toFixed(4)})),
+    xTicks:[0,5,10,15,20,25,30].map(v=>({v,l:String(v)})),
+    xLabel:'活化能 Eₐ (kJ/mol)',vName:'Eₐ (kJ/mol)'});
+
+  // shell
+  const shS=[['EC','EC','--s1'],['EMC','EMC','--s2'],['VCFEC','VC + FEC','--s3'],['PF6','PF₆⁻','--s4']];
+  stackChart(document.getElementById('chShell'),{
+    cats:TC.map(t=>t+'°C'),xLabel:'温度 (°C)',yLabel:'第一壳层分子数',ymax:4.6,
+    yTicks:[0,1,2,3,4].map(v=>({v,l:String(v)})),
+    series:shS.map(([k,nm,c])=>({name:nm,color:c,y:SH[k].map(d=>d.m),
+      fmt:v=>v.toFixed(2)+' 个',
+      inLabel:(k==='EC'||k==='EMC'||k==='PF6')?v=>v.toFixed(2):null,
+      inkOnFill:(k==='PF6')?'#0b0b0b':'#fff'})),
+    tipTitle:i=>TC[i]+' °C　合计 '+shS.reduce((a,[k])=>a+SH[k][i].m,0).toFixed(2)+' 个分子'});
+  legend(document.getElementById('lgShell'),shS.map(([k,nm,c])=>({name:nm,color:c})),true);
+
+  // pairing (ordinal ramp)
+  const prS=[['a0','0 个阴离子（"自由"）','--ord1'],['a1','1 个阴离子','--ord2'],['a2','≥2 个阴离子','--ord3']];
+  stackChart(document.getElementById('chPair'),{
+    cats:TC.map(t=>t+'°C'),xLabel:'温度 (°C)',yLabel:'占比 (%)',ymax:100,
+    yTicks:[0,25,50,75,100].map(v=>({v,l:String(v)})),
+    series:prS.map(([k,nm,c])=>({name:nm,color:c,y:PR[k].map(d=>d.m),
+      fmt:v=>v.toFixed(1)+'%',inLabel:v=>v.toFixed(0)+'%',
+      inkOnFill:(k==='ord1'||k==='a0')?'#0b0b0b':'#fff'})),
+    tipTitle:i=>TC[i]+' °C'});
+  legend(document.getElementById('lgPair'),prS.map(([k,nm,c])=>({name:nm,color:c})),true);
+
+  // sigma_CE diagnostic
+  lineChart(document.getElementById('chCE'),{
+    w:1040,h:300,x:TC,xTicks:xt,xLabel:'温度 (°C)',yLabel:'σ_CE (S/m)　— 未收敛',
+    mr:26,ml:72,zero:0,
+    yTicks:[-0.02,0,0.02,0.04,0.06,0.08,0.10].map(v=>({v,l:v.toFixed(2)})),
+    series:[
+      {name:'种子 1',color:'--s1',dotsOnly:true,
+       y:T.map(t=>t.seeds[0].sCE),fmt:(v,i)=>v.toFixed(4)+'  (R² '+T[i].seeds[0].sCE_r2.toFixed(3)+')'},
+      {name:'种子 2',color:'--s2',dotsOnly:true,
+       y:T.map(t=>t.seeds[1].sCE),fmt:(v,i)=>v.toFixed(4)+'  (R² '+T[i].seeds[1].sCE_r2.toFixed(3)+')'}],
+    tipTitle:i=>TC[i]+' °C　σ_NE = '+sNE[i].m.toFixed(3)+' S/m'});
+  legend(document.getElementById('lgCE'),[{name:'种子 1',color:'--s1'},{name:'种子 2',color:'--s2'}]);
+
+  // experiment comparison
+  const ex=[['密度 (g/cm³)',rho[1].m.toFixed(3),'~1.20–1.21','基本吻合','ok'],
+    ['D(Li⁺) (m²/s)',DD.Li[1].m.toExponential(2),'~2–3×10⁻¹⁰','低约一个数量级','no'],
+    ['σ (S/m)',sNE[1].m.toFixed(2)+'（σ_NE，上限）','~0.8–1.0','低约 4–5 倍','no'],
+    ['t(Li⁺)',tLi[1].toFixed(2),'~0.3–0.4','偏高','no']];
+  const eb=document.getElementById('expTbl');eb.textContent='';
+  ex.forEach(r=>{const tr=document.createElement('tr');
+    r.slice(0,4).forEach((c,i)=>{const td=document.createElement('td');
+      if(i===0||i===3)td.style.textAlign='left';
+      if(i===3)td.className=r[4];td.textContent=c;tr.appendChild(td);});
+    eb.appendChild(tr);});
+
+  // beta
+  const bb=document.getElementById('betaTbl');bb.textContent='';
+  TC.forEach(t=>{const b=RAW.beta[String(t)];const tr=document.createElement('tr');
+    [String(t),b.toFixed(3),b<0.93?'尚未完全进入扩散区（β<1）':'接近理想扩散'].forEach((c,i)=>{
+      const td=document.createElement('td');if(i===2){td.style.textAlign='left';
+        td.className=b<0.93?'no':'ok';}td.textContent=c;tr.appendChild(td);});
+    bb.appendChild(tr);});
+
+  // full table
+  const cols=['温度 (°C)','种子','密度 (g/cm³)','体积 (nm³)','[Li⁺] (M)',
+    'D(Li⁺)','D(PF₆⁻)','D(EC)','D(EMC)','σ_NE','σ_CE','σ_CE R²',
+    '配位数','壳层 EC','壳层 EMC','壳层 PF₆⁻','0 阴 (%)','1 阴 (%)','≥2 阴 (%)'];
+  const ft=document.getElementById('fullTbl');ft.textContent='';
+  const thead=document.createElement('thead'),hr=document.createElement('tr');
+  cols.forEach(c=>{const th=document.createElement('th');th.textContent=c;hr.appendChild(th);});
+  thead.appendChild(hr);ft.appendChild(thead);
+  const tb=document.createElement('tbody');
+  T.forEach(t=>t.seeds.forEach(s=>{
+    const tr=document.createElement('tr');
+    [t.T_C,s.seed,s.rho.toFixed(4),s.vol.toFixed(2),s.conc.toFixed(4),
+     s.D.Li.D.toExponential(3),s.D.PF6.D.toExponential(3),
+     s.D.EC.D.toExponential(3),s.D.EMC.D.toExponential(3),
+     s.sNE.toFixed(4),s.sCE.toFixed(4),s.sCE_r2.toFixed(3),s.CN.toFixed(2),
+     (s.shell.EC||0).toFixed(2),(s.shell.EMC||0).toFixed(2),(s.shell.PF6||0).toFixed(2),
+     s.pair['0_anions'].toFixed(1),s.pair['1_anion'].toFixed(1),s.pair['2plus_anions'].toFixed(1)]
+    .forEach((v,i)=>{const td=document.createElement('td');
+      if(i===1)td.style.textAlign='left';td.textContent=v;tr.appendChild(td);});
+    tb.appendChild(tr);}));
+  ft.appendChild(tb);
+}
+
+/* theme + table toggles */
+const thBtn=document.getElementById('thBtn');
+thBtn.addEventListener('click',()=>{
+  const cur=document.documentElement.getAttribute('data-theme');
+  const dark=cur?cur==='dark':matchMedia('(prefers-color-scheme:dark)').matches;
+  document.documentElement.setAttribute('data-theme',dark?'light':'dark');
+  requestAnimationFrame(render);});
+const tblBtn=document.getElementById('tblBtn'),tblView=document.getElementById('tblView');
+tblBtn.addEventListener('click',()=>{
+  const on=tblView.classList.toggle('hidden')===false;
+  tblBtn.setAttribute('aria-pressed',String(on));
+  if(on)tblView.scrollIntoView({behavior:'smooth',block:'start'});});
+matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>{
+  if(!document.documentElement.getAttribute('data-theme'))requestAnimationFrame(render);});
+addEventListener('scroll',hideTip,{passive:true});
+render();
+</script>
+</body>
+</html>
